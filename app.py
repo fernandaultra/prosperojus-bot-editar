@@ -1,15 +1,19 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from services.gpt_service import gerar_resposta_com_gpt
-from markdown import markdown
-from markupsafe import Markup
-from datetime import datetime
-from collections import defaultdict
-from utils.audio_utils import download_audio
-import openai
+import requests
 import os
+from dotenv import load_dotenv  # Carrega variáveis do .env
+
+load_dotenv()  # Ativa leitura do .env
 
 app = Flask(__name__)
-historico = []
+
+historico = [
+    {
+        "mensagem": "Olá, tenho um precatório para vender.",
+        "resposta": "Olá! Posso te ajudar com isso 😊. Me diga o número do processo."
+    }
+]
 
 @app.route("/", methods=["GET"])
 def home():
@@ -17,148 +21,109 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def receber_mensagem():
-    try:
-        dados = request.get_json(force=True)
-    except Exception as e:
-        return jsonify({"error": "Erro ao interpretar JSON", "detalhe": str(e)}), 400
+    dados = request.json
+    mensagem_cliente = dados.get("mensagem")
 
-    numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
-    mensagem = (
-        dados.get("message") or
-        dados.get("body") or
-        dados.get("text") or
-        dados.get("text", {}).get("message") or
-        dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
-    )
+    if not mensagem_cliente:
+        return jsonify({"erro": "Mensagem não fornecida"}), 400
 
-    sugestao = ""
-
-    try:
-        if not mensagem and dados.get("audio", {}).get("audioUrl"):
-            audio_url = dados["audio"]["audioUrl"]
-            local_path = download_audio(audio_url)
-            with open(local_path, "rb") as audio_file:
-                transcript = openai.Audio.transcribe("whisper-1", audio_file)
-            transcribed = transcript["text"]
-            mensagem = f"[ÁUDIO TRANSCRITO] {transcribed}"
-            sugestao = gerar_resposta_com_gpt(transcribed)
-        elif mensagem:
-            sugestao = gerar_resposta_com_gpt(mensagem)
-        else:
-            mensagem = "[❗Mensagem não identificada ou sem conteúdo processável]"
-            sugestao = "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
-    except Exception as e:
-        mensagem = mensagem or "[⚠️ Erro ao processar áudio/texto]"
-        sugestao = "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
+    resposta_gerada = gerar_resposta_com_gpt(mensagem_cliente)
 
     historico.append({
-        "numero": numero,
-        "mensagem": mensagem,
-        "sugestao": sugestao,
-        "datahora": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        "mensagem": mensagem_cliente,
+        "resposta": resposta_gerada
     })
 
-    return jsonify({
-        "status": "mensagem registrada",
-        "mensagem_recebida": mensagem,
-        "sugestao_de_resposta": sugestao
-    }), 200
+    return jsonify({"resposta": resposta_gerada}), 200
 
 @app.route("/mensagens", methods=["GET"])
-def exibir_mensagens():
-    agrupadas = defaultdict(list)
-    for item in reversed(historico):
-        agrupadas[item["numero"]].append(item)
-        agrupadas[item["numero"]] = agrupadas[item["numero"]][:10]
-
-    for lista in agrupadas.values():
-        for item in lista:
-            item["sugestao_html"] = Markup(markdown(item["sugestao"]))
-
-    html_template = """
+def mensagens():
+    html = """
     <html>
     <head>
-        <meta charset="utf-8">
-        <title>💬 Mensagens Recebidas - ProsperoJus</title>
-        <meta http-equiv="refresh" content="15">
+        <title>Mensagens Recebidas - ProsperoJus</title>
         <style>
-            body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-            .mensagem { background: #fff; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 0 5px rgba(0,0,0,0.1); }
-            .data { color: #888; font-size: 12px; }
-            .sugestao { margin-top: 10px; background: #eef; padding: 10px; border-radius: 5px; }
-            .btn { margin-top: 5px; cursor: pointer; padding: 5px 10px; border: none; border-radius: 4px; }
-            .btn-copiar { background-color: #4CAF50; color: white; }
-            .btn-editar { background-color: #2196F3; color: white; margin-left: 5px; }
-            .btn-salvar { background-color: #FF9800; color: white; display: none; margin-left: 5px; }
-            [contenteditable] { outline: 1px dashed #666; min-height: 60px; }
+            body { font-family: Arial; padding: 20px; background-color: #f9f9f9; }
+            .card {
+                background-color: white;
+                padding: 15px;
+                border-radius: 10px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                margin-bottom: 20px;
+            }
+            textarea { width: 100%; height: 60px; margin-top: 10px; }
+            button { margin-top: 5px; padding: 5px 10px; }
         </style>
-        <script>
-            function copiarTexto(id) {
-                const texto = document.getElementById(id).innerText;
-                navigator.clipboard.writeText(texto).then(() => alert('Texto copiado!'));
-            }
-
-            function editar(id, btnId) {
-                const el = document.getElementById(id);
-                el.setAttribute('contenteditable', true);
-                document.getElementById(btnId).style.display = 'inline-block';
-                el.focus();
-            }
-
-            function salvar(id, numero) {
-                const texto = document.getElementById(id).innerText;
-                fetch('/atualizar_contexto', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ texto: texto, numero: numero })
-                })
-                .then(r => r.json())
-                .then(r => alert(r.status || r.error));
-            }
-        </script>
     </head>
     <body>
         <h1>📨 Mensagens Recebidas - ProsperoJus</h1>
-        {% for numero, mensagens in agrupadas.items() %}
-            <h3>📱 {{ numero }}</h3>
-            {% for item in mensagens %}
-                <div class="mensagem">
-                    <div class="data">📅 {{ item["datahora"] }}</div>
-                    <strong>Mensagem:</strong> {{ item["mensagem"] }}
-                    <div class="sugestao">
-                        <strong>Sugestão:</strong>
-                        <div id="sugestao{{ loop.index }}" class="editable">{{ item["sugestao_html"] }}</div>
-                        <button class="btn btn-copiar" onclick="copiarTexto('sugestao{{ loop.index }}')">📋 Copiar</button>
-                        <button class="btn btn-editar" onclick="editar('sugestao{{ loop.index }}', 'salvar{{ loop.index }}')">✏️ Editar</button>
-                        <button id="salvar{{ loop.index }}" class="btn btn-salvar" onclick="salvar('sugestao{{ loop.index }}', '{{ numero }}')">💾 Salvar Edição</button>
-                    </div>
-                </div>
-            {% endfor %}
+        {% for item in historico %}
+            <div class="card">
+                <strong>Mensagem recebida:</strong><br> {{ item.mensagem }}<br><br>
+                <strong>Sugestão de resposta:</strong><br> {{ item.resposta }}
+
+                <form method="POST" action="/editar">
+                    <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
+                    <textarea name="resposta">{{ item.resposta }}</textarea>
+                    <button type="submit">📏 Salvar edição</button>
+                </form>
+            </div>
         {% endfor %}
     </body>
     </html>
     """
-    return render_template_string(html_template, agrupadas=agrupadas)
+    return render_template_string(html, historico=historico)
 
-@app.route("/atualizar_contexto", methods=["POST"])
-def atualizar_contexto():
-    dados = request.get_json()
-    texto = dados.get("texto", "").strip()
-    numero = dados.get("numero")
+@app.route("/editar", methods=["POST"])
+def editar():
+    mensagem = request.form.get("mensagem")
+    nova_resposta = request.form.get("resposta")
 
-    if not texto:
-        return jsonify({"error": "Texto vazio"}), 400
+    for item in historico:
+        if item["mensagem"] == mensagem:
+            item["resposta"] = nova_resposta
+            break
 
-    timestamp = datetime.now().strftime("%d/%m/%Y %H:%M")
-    entrada = f"\n\nCLIENTE: {numero}\nSUGESTÃO ORIGINAL: (original omitida)\nRESPOSTA EDITADA ({timestamp}):\n{texto}\n---"
+    atualizar_contexto_no_github()
+    return redirect(url_for('mensagens'))
 
-    try:
-        with open("contexto.txt", "a", encoding="utf-8") as f:
-            f.write(entrada)
-        return jsonify({"status": "✅ Resposta salva com sucesso no contexto.txt"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+def atualizar_contexto_no_github():
+    token = os.getenv("GITHUB_TOKEN")
+    repo = "fernandaultra/prosperojus-bot-editar"
+    branch = "main"
+    path = "contexto.txt"
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    url_get = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+    r_get = requests.get(url_get, headers=headers)
+    if r_get.status_code != 200:
+        print("Erro ao obter SHA do arquivo:", r_get.text)
+        return
+
+    sha = r_get.json()["sha"]
+
+    novo_conteudo = "\n\n".join(
+        f"📩 {item['mensagem']}\n💬 {item['resposta']}" for item in historico
+    )
+
+    import base64
+    payload = {
+        "message": "📝 Atualização automática do contexto.txt pelo bot",
+        "content": base64.b64encode(novo_conteudo.encode()).decode("utf-8"),
+        "sha": sha,
+        "branch": branch
+    }
+
+    r_put = requests.put(url_get, headers=headers, json=payload)
+
+    if r_put.status_code == 200 or r_put.status_code == 201:
+        print("✅ contexto.txt atualizado com sucesso no GitHub!")
+    else:
+        print("❌ Erro ao atualizar contexto.txt:", r_put.text)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(debug=True, port=int(os.environ.get("PORT", 10000)))
