@@ -10,14 +10,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Dicionário para armazenar mensagens agrupadas por telefone
-historico_por_telefone = {
-    "5581988881111": [
-        {
-            "mensagem": "Oi, tenho um precatório.",
-            "resposta": "Olá! Podemos te ajudar com isso. Qual o número do processo?"
-        }
-    ]
-}
+historico_por_telefone = {}
 
 @app.route("/", methods=["GET"])
 def home():
@@ -26,11 +19,13 @@ def home():
 @app.route("/webhook", methods=["POST"])
 def receber_mensagem():
     dados = request.json
-    telefone = dados.get("telefone")
-    mensagem_cliente = dados.get("mensagem")
 
-    if not telefone or not mensagem_cliente:
-        return jsonify({"erro": "Telefone ou mensagem não fornecidos"}), 400
+    try:
+        telefone_completo = dados["message"]["from"]  # Ex: '5521983031111@c.us'
+        telefone = telefone_completo.split("@")[0]
+        mensagem_cliente = dados["message"]["body"]
+    except Exception as e:
+        return jsonify({"erro": f"Erro ao ler mensagem recebida: {e}"}), 400
 
     resposta_gerada = gerar_resposta_com_gpt(mensagem_cliente)
 
@@ -149,7 +144,6 @@ def atualizar_contexto_no_github():
 
     sha = r_get.json()["sha"]
 
-    # Compila todas as respostas de todos os telefones
     conteudo_total = []
     for tel, mensagens in historico_por_telefone.items():
         for item in mensagens:
