@@ -1,15 +1,19 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, request
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from services.gpt_service import gerar_resposta_com_gpt
+from markupsafe import Markup
+from utils.audio_utils import download_audio
+from datetime import datetime
 import requests
+import openai
 import os
-from dotenv import load_dotenv
 import base64
+from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Dicionário para armazenar mensagens agrupadas por telefone
+# Histórico de mensagens agrupado por telefone
 historico_por_telefone = {}
 
 @app.route("/", methods=["GET"])
@@ -18,26 +22,62 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def receber_mensagem():
-    dados = request.json
+    print("📦 request.data:", request.data)
+    print("📦 request.headers:", dict(request.headers))
 
     try:
-        telefone_completo = dados["message"]["from"]  # Ex: '5521983031111@c.us'
-        telefone = telefone_completo.split("@")[0]
-        mensagem_cliente = dados["message"]["body"]
+        dados = request.get_json(force=True)
+        print("📥 JSON recebido:", dados)
     except Exception as e:
-        return jsonify({"erro": f"Erro ao ler mensagem recebida: {e}"}), 400
+        return jsonify({"error": "Erro ao interpretar JSON", "detalhe": str(e)}), 400
 
-    resposta_gerada = gerar_resposta_com_gpt(mensagem_cliente)
+    numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
 
-    if telefone not in historico_por_telefone:
-        historico_por_telefone[telefone] = []
+    mensagem = (
+        dados.get("message") or
+        dados.get("body") or
+        dados.get("text") or
+        dados.get("text", {}).get("message") or
+        dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
+    )
 
-    historico_por_telefone[telefone].append({
-        "mensagem": mensagem_cliente,
-        "resposta": resposta_gerada
+    sugestao = ""
+
+    try:
+        if not mensagem and dados.get("audio", {}).get("audioUrl"):
+            audio_url = dados["audio"]["audioUrl"]
+            local_path = download_audio(audio_url)
+            with open(local_path, "rb") as audio_file:
+                transcript = openai.Audio.transcribe("whisper-1", audio_file)
+            transcribed = transcript["text"]
+            mensagem = f"[ÁUDIO TRANSCRITO] {transcribed}"
+            sugestao = gerar_resposta_com_gpt(transcribed)
+        elif mensagem:
+            sugestao = gerar_resposta_com_gpt(mensagem)
+        else:
+            mensagem = "[❗Mensagem não identificada ou sem conteúdo processável]"
+            sugestao = "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
+    except Exception as e:
+        print("❌ Erro ao gerar sugestão:", e)
+        mensagem = mensagem or "[⚠️ Erro ao processar áudio/texto]"
+        sugestao = "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
+
+    if numero not in historico_por_telefone:
+        historico_por_telefone[numero] = []
+
+    historico_por_telefone[numero].append({
+        "mensagem": mensagem,
+        "resposta": sugestao,
+        "datahora": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     })
 
-    return jsonify({"resposta": resposta_gerada}), 200
+    print("✅ Mensagem registrada:", {"numero": numero, "mensagem": mensagem, "sugestao": sugestao})
+
+    return jsonify({
+        "status": "mensagem registrada",
+        "mensagem_recebida": mensagem,
+        "sugestao_de_resposta": sugestao
+    }), 200
 
 @app.route("/mensagens", methods=["GET"])
 def mensagens():
@@ -94,6 +134,7 @@ def mensagens():
         </div>
         {% for item in mensagens %}
             <div class="card">
+                <strong>📅 {{ item.datahora }}</strong><br>
                 <strong>Mensagem recebida:</strong><br> {{ item.mensagem }}<br><br>
                 <strong>Sugestão de resposta:</strong>
                 <div id="resposta-text-{{ loop.index }}" class="resposta">{{ item.resposta }}</div>
