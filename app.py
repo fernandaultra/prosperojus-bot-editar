@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from datetime import datetime
 from markdown import markdown
 from markupsafe import Markup
+import requests
+
 
 app = Flask(__name__)
 load_dotenv()
