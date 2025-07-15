@@ -2,9 +2,10 @@ from flask import Flask, request, jsonify, render_template_string, redirect, url
 from services.gpt_service import gerar_resposta_com_gpt
 import requests
 import os
-from dotenv import load_dotenv  # Carrega variáveis do .env
+from dotenv import load_dotenv
+import base64
 
-load_dotenv()  # Ativa leitura do .env
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -51,21 +52,35 @@ def mensagens():
                 box-shadow: 0 2px 5px rgba(0,0,0,0.1);
                 margin-bottom: 20px;
             }
-            textarea { width: 100%; height: 60px; margin-top: 10px; }
-            button { margin-top: 5px; padding: 5px 10px; }
+            .resposta { margin-top: 10px; white-space: pre-wrap; }
+            textarea { width: 100%; height: 60px; margin-top: 10px; display: none; }
+            button { margin-top: 10px; padding: 5px 10px; cursor: pointer; }
         </style>
+        <script>
+            function ativarEdicao(id) {
+                const respostaText = document.getElementById('resposta-text-' + id);
+                const respostaInput = document.getElementById('resposta-input-' + id);
+                const editarBtn = document.getElementById('editar-btn-' + id);
+
+                respostaText.style.display = 'none';
+                respostaInput.style.display = 'block';
+                editarBtn.innerText = '💾 Salvar edição';
+                editarBtn.onclick = function() { document.getElementById('form-' + id).submit(); };
+            }
+        </script>
     </head>
     <body>
         <h1>📨 Mensagens Recebidas - ProsperoJus</h1>
         {% for item in historico %}
             <div class="card">
                 <strong>Mensagem recebida:</strong><br> {{ item.mensagem }}<br><br>
-                <strong>Sugestão de resposta:</strong><br> {{ item.resposta }}
+                <strong>Sugestão de resposta:</strong>
+                <div id="resposta-text-{{ loop.index }}" class="resposta">{{ item.resposta }}</div>
 
-                <form method="POST" action="/editar">
+                <form method="POST" action="/editar" id="form-{{ loop.index }}">
                     <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
-                    <textarea name="resposta">{{ item.resposta }}</textarea>
-                    <button type="submit">📏 Salvar edição</button>
+                    <textarea name="resposta" id="resposta-input-{{ loop.index }}">{{ item.resposta }}</textarea>
+                    <button type="button" onclick="ativarEdicao({{ loop.index }})" id="editar-btn-{{ loop.index }}">✏️ Editar</button>
                 </form>
             </div>
         {% endfor %}
@@ -110,7 +125,6 @@ def atualizar_contexto_no_github():
         f"📩 {item['mensagem']}\n💬 {item['resposta']}" for item in historico
     )
 
-    import base64
     payload = {
         "message": "📝 Atualização automática do contexto.txt pelo bot",
         "content": base64.b64encode(novo_conteudo.encode()).decode("utf-8"),
@@ -127,4 +141,3 @@ def atualizar_contexto_no_github():
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-
