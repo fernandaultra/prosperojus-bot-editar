@@ -1,3 +1,6 @@
+📩 {'message': 'é legal vender um precatório? eu posso fazer isso?'}
+💬 💬 Olá! Sim, é totalmente legal vender o seu precatório. É um direito seu como credor. Nós da ProsperoJus somos especialistas em negociação de precatórios e podemos te ajudar com o processo. Você pode nos fornecer mais detalhes sobre o seu precatório?
+
 📩 {'message': 'quais as vantagens de eu vender meu precatório para vocês?'}
 💬 💬 Olá! Nosso objetivo é proporcionar a você uma maneira rápida e segura de transformar seu precatório em dinheiro. Aqui estão algumas vantagens de negociar seu precatório com a ProsperoJus:
 
