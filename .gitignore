@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.env
+.venv/
+venv/
+.env
+
+# Arquivos de áudio temporários
+*.mp3
+*.wav
+temp_audio/
+
+# macOS
+.DS_Store
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
