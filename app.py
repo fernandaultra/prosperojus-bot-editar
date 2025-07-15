@@ -6,11 +6,12 @@ import os
 import base64
 from dotenv import load_dotenv
 from datetime import datetime
+from markdown import markdown
+from markupsafe import Markup
 
 app = Flask(__name__)
 load_dotenv()
 
-# Armazena histórico por número
 historico_por_telefone = {}
 MAX_MENSAGENS = 10
 
@@ -59,6 +60,7 @@ def receber_mensagem():
     historico_por_telefone[numero].insert(0, {
         "mensagem": mensagem,
         "resposta": resposta,
+        "html": Markup(markdown(resposta)),
         "datahora": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     })
 
@@ -111,7 +113,7 @@ def mensagens():
                 <div><strong>📥 Mensagem:</strong> {{ item.mensagem }}</div>
                 <div class="sugestao">
                     <strong>🤖 Sugestão:</strong>
-                    <div id="resposta-{{ loop.index }}">{{ item.resposta }}</div>
+                    <div id="resposta-{{ loop.index }}">{{ item.html|safe }}</div>
                     <form method="POST" action="/editar">
                         <input type="hidden" name="telefone" value="{{ telefone }}">
                         <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
@@ -137,6 +139,7 @@ def editar():
     for item in historico_por_telefone.get(telefone, []):
         if item['mensagem'] == mensagem_original:
             item['resposta'] = nova_resposta
+            item['html'] = Markup(markdown(nova_resposta))
             break
 
     atualizar_contexto_no_github()
@@ -153,21 +156,18 @@ def atualizar_contexto_no_github():
         "Accept": "application/vnd.github+json"
     }
 
-    # 1. Pega o SHA atual
     r_get = requests.get(f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}", headers=headers)
     if r_get.status_code != 200:
         print("Erro ao obter SHA:", r_get.text)
         return
     sha = r_get.json()["sha"]
 
-    # 2. Monta novo conteúdo
     conteudo_total = []
     for tel, lista in historico_por_telefone.items():
         for item in lista:
             conteudo_total.append(f"📩 {item['mensagem']}\n💬 {item['resposta']}")
     novo_texto = "\n\n".join(conteudo_total)
 
-    # 3. Atualiza arquivo
     payload = {
         "message": "📝 Atualização automática do contexto.txt",
         "content": base64.b64encode(novo_texto.encode()).decode("utf-8"),
