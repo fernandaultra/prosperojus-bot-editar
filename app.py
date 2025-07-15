@@ -4,12 +4,11 @@ from utils.audio_utils import download_audio
 import openai
 import os
 import base64
+import requests
 from dotenv import load_dotenv
 from datetime import datetime
 from markdown import markdown
 from markupsafe import Markup
-import requests
-
 
 app = Flask(__name__)
 load_dotenv()
@@ -38,6 +37,12 @@ def receber_mensagem():
         dados.get("text", {}).get("message") or
         dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
     )
+
+    if isinstance(mensagem, dict):
+        mensagem = mensagem.get("message") or str(mensagem)
+
+    if isinstance(mensagem, str) and mensagem.startswith("{'message': "):
+        mensagem = mensagem.replace("{'message': '", "").rstrip("'}")
 
     resposta = ""
     try:
@@ -87,7 +92,9 @@ def mensagens():
             .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; }
             .sugestao { margin-top: 10px; }
             textarea { width: 100%; height: 80px; display: none; margin-top: 10px; }
-            button { margin-top: 5px; margin-right: 10px; }
+            button { margin-top: 5px; margin-right: 10px; cursor: pointer; padding: 5px 10px; border: none; border-radius: 5px; }
+            .btn-editar { background-color: #f9c74f; }
+            .btn-copiar { background-color: #90be6d; }
         </style>
         <script>
             function editar(id) {
@@ -120,9 +127,9 @@ def mensagens():
                         <input type="hidden" name="telefone" value="{{ telefone }}">
                         <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
                         <textarea name="nova_resposta" id="edit-{{ loop.index }}">{{ item.resposta }}</textarea>
-                        <button type="button" id="btn-editar-{{ loop.index }}" onclick="editar({{ loop.index }})">✏️ Editar</button>
+                        <button type="button" id="btn-editar-{{ loop.index }}" class="btn-editar" onclick="editar({{ loop.index }})">✏️ Editar</button>
                         <button type="submit" id="btn-salvar-{{ loop.index }}" style="display:none;">💾 Salvar texto</button>
-                        <button type="button" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
+                        <button type="button" class="btn-copiar" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
                     </form>
                 </div>
             </div>
