@@ -126,4 +126,5 @@ def atualizar_contexto_no_github():
         print("❌ Erro ao atualizar contexto.txt:", r_put.text)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=int(os.environ.get("PORT", 10000)))
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
