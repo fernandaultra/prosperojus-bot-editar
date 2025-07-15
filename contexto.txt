@@ -1,2 +1,12 @@
-📩 Oi, tenho um precatório.
-💬 Olá! Podemos te ajudar com isso. Qual o número do processo?
+📩 {'message': 'quais as vantagens de eu vender meu precatório para vocês?'}
+💬 💬 Olá! Nosso objetivo é proporcionar a você uma maneira rápida e segura de transformar seu precatório em dinheiro. Aqui estão algumas vantagens de negociar seu precatório com a ProsperoJus:
+
+1. Liquidez Imediata: Em vez de esperar anos pelo pagamento do governo, nós compramos seu precatório e você recebe o dinheiro em um curto prazo.
+
+2. Segurança: Nós cuidamos de toda a documentação e processo legal, garantindo uma transação segura e transparente.
+
+3. Melhor Planejamento Financeiro: Com o dinheiro do precatório em mãos, você pode investir, pagar dívidas ou realizar um sonho sem ter que esperar.
+
+4. Negociação Justa: Nossa equipe de especialistas avalia seu precatório para oferecer um valor justo de acordo com as condições atuais do mercado.
+
+Ficaremos felizes em responder qualquer outra dúvida que você possa ter.
