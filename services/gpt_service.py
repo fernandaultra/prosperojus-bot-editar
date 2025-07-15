@@ -9,7 +9,7 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def carregar_contexto():
-    caminho = "scripts/contexto.txt"
+    caminho = "contexto.txt"
     if not os.path.exists(caminho):
         raise FileNotFoundError(f"Arquivo de contexto não encontrado: {caminho}")
     with open(caminho, "r", encoding="utf-8") as f:
