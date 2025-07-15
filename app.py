@@ -1,20 +1,18 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from services.gpt_service import gerar_resposta_com_gpt
-from markupsafe import Markup
 from utils.audio_utils import download_audio
-from datetime import datetime
-import requests
 import openai
 import os
 import base64
 from dotenv import load_dotenv
-
-load_dotenv()
+from datetime import datetime
 
 app = Flask(__name__)
+load_dotenv()
 
-# Histórico de mensagens agrupado por telefone
+# Armazena histórico por número
 historico_por_telefone = {}
+MAX_MENSAGENS = 10
 
 @app.route("/", methods=["GET"])
 def home():
@@ -22,14 +20,11 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def receber_mensagem():
-    print("📦 request.data:", request.data)
-    print("📦 request.headers:", dict(request.headers))
-
     try:
         dados = request.get_json(force=True)
         print("📥 JSON recebido:", dados)
     except Exception as e:
-        return jsonify({"error": "Erro ao interpretar JSON", "detalhe": str(e)}), 400
+        return jsonify({"erro": f"Erro ao ler JSON: {e}"}), 400
 
     numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
 
@@ -41,126 +36,107 @@ def receber_mensagem():
         dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
     )
 
-    sugestao = ""
-
+    resposta = ""
     try:
         if not mensagem and dados.get("audio", {}).get("audioUrl"):
             audio_url = dados["audio"]["audioUrl"]
             local_path = download_audio(audio_url)
-            with open(local_path, "rb") as audio_file:
-                transcript = openai.Audio.transcribe("whisper-1", audio_file)
-            transcribed = transcript["text"]
-            mensagem = f"[ÁUDIO TRANSCRITO] {transcribed}"
-            sugestao = gerar_resposta_com_gpt(transcribed)
+            with open(local_path, "rb") as f:
+                transcript = openai.Audio.transcribe("whisper-1", f)
+            mensagem = f"[ÁUDIO TRANSCRITO] {transcript['text']}"
+            resposta = gerar_resposta_com_gpt(transcript['text'])
         elif mensagem:
-            sugestao = gerar_resposta_com_gpt(mensagem)
+            resposta = gerar_resposta_com_gpt(mensagem)
         else:
-            mensagem = "[❗Mensagem não identificada ou sem conteúdo processável]"
-            sugestao = "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
+            mensagem = "[mensagem vazia ou sem suporte]"
+            resposta = "⚠️ Não foi possível gerar uma resposta."
     except Exception as e:
-        print("❌ Erro ao gerar sugestão:", e)
-        mensagem = mensagem or "[⚠️ Erro ao processar áudio/texto]"
-        sugestao = "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
+        resposta = f"⚠️ Erro ao gerar sugestão: {e}"
 
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
 
-    historico_por_telefone[numero].append({
+    historico_por_telefone[numero].insert(0, {
         "mensagem": mensagem,
-        "resposta": sugestao,
+        "resposta": resposta,
         "datahora": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     })
 
-    print("✅ Mensagem registrada:", {"numero": numero, "mensagem": mensagem, "sugestao": sugestao})
+    historico_por_telefone[numero] = historico_por_telefone[numero][:MAX_MENSAGENS]
 
-    return jsonify({
-        "status": "mensagem registrada",
-        "mensagem_recebida": mensagem,
-        "sugestao_de_resposta": sugestao
-    }), 200
+    return jsonify({"resposta": resposta}), 200
 
 @app.route("/mensagens", methods=["GET"])
 def mensagens():
-    telefone_selecionado = request.args.get("telefone")
+    telefone = request.args.get("telefone")
     telefones = list(historico_por_telefone.keys())
-    mensagens = historico_por_telefone.get(telefone_selecionado, []) if telefone_selecionado else []
+    mensagens = historico_por_telefone.get(telefone, [])
 
     html = """
     <html>
     <head>
-        <title>Mensagens Recebidas - ProsperoJus</title>
+        <meta charset='utf-8'>
+        <title>📨 Mensagens - ProsperoJus</title>
         <style>
-            body { font-family: Arial; padding: 20px; background-color: #f9f9f9; }
-            .abas { margin-bottom: 20px; }
-            .abas a {
-                margin-right: 10px;
-                padding: 8px 12px;
-                background-color: #eee;
-                border-radius: 5px;
-                text-decoration: none;
-                color: #333;
-            }
-            .abas a.selecionado { background-color: #ccc; font-weight: bold; }
-            .card {
-                background-color: white;
-                padding: 15px;
-                border-radius: 10px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                margin-bottom: 20px;
-            }
-            .resposta { margin-top: 10px; white-space: pre-wrap; }
-            textarea { width: 100%; height: 60px; margin-top: 10px; display: none; }
-            button { margin-top: 10px; padding: 5px 10px; cursor: pointer; }
+            body { font-family: Arial; padding: 20px; }
+            .abas a { margin-right: 10px; text-decoration: none; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+            .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; }
+            .sugestao { margin-top: 10px; }
+            textarea { width: 100%; height: 80px; display: none; margin-top: 10px; }
+            button { margin-top: 5px; margin-right: 10px; }
         </style>
         <script>
-            function ativarEdicao(id) {
-                const respostaText = document.getElementById('resposta-text-' + id);
-                const respostaInput = document.getElementById('resposta-input-' + id);
-                const editarBtn = document.getElementById('editar-btn-' + id);
-
-                respostaText.style.display = 'none';
-                respostaInput.style.display = 'block';
-                editarBtn.innerText = '💾 Salvar edição';
-                editarBtn.onclick = function() { document.getElementById('form-' + id).submit(); };
+            function editar(id) {
+                document.getElementById('resposta-'+id).style.display = 'none';
+                document.getElementById('edit-'+id).style.display = 'block';
+                document.getElementById('btn-editar-'+id).style.display = 'none';
+                document.getElementById('btn-salvar-'+id).style.display = 'inline';
+            }
+            function copiarTexto(id) {
+                navigator.clipboard.writeText(document.getElementById(id).innerText);
+                alert('Texto copiado!');
             }
         </script>
     </head>
     <body>
-        <h1>📨 Mensagens Recebidas - ProsperoJus</h1>
+        <h2>📨 Mensagens Recebidas - ProsperoJus</h2>
         <div class="abas">
             {% for tel in telefones %}
-                <a href="/mensagens?telefone={{ tel }}" class="{% if tel == telefone_selecionado %}selecionado{% endif %}">{{ tel }}</a>
+                <a href="/mensagens?telefone={{ tel }}">{{ tel }}</a>
             {% endfor %}
         </div>
         {% for item in mensagens %}
             <div class="card">
-                <strong>📅 {{ item.datahora }}</strong><br>
-                <strong>Mensagem recebida:</strong><br> {{ item.mensagem }}<br><br>
-                <strong>Sugestão de resposta:</strong>
-                <div id="resposta-text-{{ loop.index }}" class="resposta">{{ item.resposta }}</div>
-
-                <form method="POST" action="/editar" id="form-{{ loop.index }}">
-                    <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
-                    <input type="hidden" name="telefone" value="{{ telefone_selecionado }}">
-                    <textarea name="resposta" id="resposta-input-{{ loop.index }}">{{ item.resposta }}</textarea>
-                    <button type="button" onclick="ativarEdicao({{ loop.index }})" id="editar-btn-{{ loop.index }}">✏️ Editar</button>
-                </form>
+                <div><strong>📅 {{ item.datahora }}</strong></div>
+                <div><strong>📥 Mensagem:</strong> {{ item.mensagem }}</div>
+                <div class="sugestao">
+                    <strong>🤖 Sugestão:</strong>
+                    <div id="resposta-{{ loop.index }}">{{ item.resposta }}</div>
+                    <form method="POST" action="/editar">
+                        <input type="hidden" name="telefone" value="{{ telefone }}">
+                        <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
+                        <textarea name="nova_resposta" id="edit-{{ loop.index }}">{{ item.resposta }}</textarea>
+                        <button type="button" id="btn-editar-{{ loop.index }}" onclick="editar({{ loop.index }})">✏️ Editar</button>
+                        <button type="submit" id="btn-salvar-{{ loop.index }}" style="display:none;">💾 Salvar texto</button>
+                        <button type="button" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
+                    </form>
+                </div>
             </div>
         {% endfor %}
     </body>
     </html>
     """
-    return render_template_string(html, telefones=telefones, telefone_selecionado=telefone_selecionado, mensagens=mensagens)
+    return render_template_string(html, telefones=telefones, telefone=telefone, mensagens=mensagens)
 
 @app.route("/editar", methods=["POST"])
 def editar():
     telefone = request.form.get("telefone")
-    mensagem = request.form.get("mensagem")
-    nova_resposta = request.form.get("resposta")
+    mensagem_original = request.form.get("mensagem")
+    nova_resposta = request.form.get("nova_resposta")
 
     for item in historico_por_telefone.get(telefone, []):
-        if item["mensagem"] == mensagem:
-            item["resposta"] = nova_resposta
+        if item['mensagem'] == mensagem_original:
+            item['resposta'] = nova_resposta
             break
 
     atualizar_contexto_no_github()
@@ -177,34 +153,29 @@ def atualizar_contexto_no_github():
         "Accept": "application/vnd.github+json"
     }
 
-    url_get = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
-    r_get = requests.get(url_get, headers=headers)
+    # 1. Pega o SHA atual
+    r_get = requests.get(f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}", headers=headers)
     if r_get.status_code != 200:
-        print("Erro ao obter SHA do arquivo:", r_get.text)
+        print("Erro ao obter SHA:", r_get.text)
         return
-
     sha = r_get.json()["sha"]
 
+    # 2. Monta novo conteúdo
     conteudo_total = []
-    for tel, mensagens in historico_por_telefone.items():
-        for item in mensagens:
+    for tel, lista in historico_por_telefone.items():
+        for item in lista:
             conteudo_total.append(f"📩 {item['mensagem']}\n💬 {item['resposta']}")
+    novo_texto = "\n\n".join(conteudo_total)
 
-    novo_conteudo = "\n\n".join(conteudo_total)
-
+    # 3. Atualiza arquivo
     payload = {
-        "message": "📝 Atualização automática do contexto.txt pelo bot",
-        "content": base64.b64encode(novo_conteudo.encode()).decode("utf-8"),
+        "message": "📝 Atualização automática do contexto.txt",
+        "content": base64.b64encode(novo_texto.encode()).decode("utf-8"),
         "sha": sha,
         "branch": branch
     }
-
-    r_put = requests.put(url_get, headers=headers, json=payload)
-
-    if r_put.status_code in [200, 201]:
-        print("✅ contexto.txt atualizado com sucesso no GitHub!")
-    else:
-        print("❌ Erro ao atualizar contexto.txt:", r_put.text)
+    r_put = requests.put(f"https://api.github.com/repos/{repo}/contents/{path}", headers=headers, json=payload)
+    print("✅ Atualização GitHub status:", r_put.status_code)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
