@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 # Carrega variáveis de ambiente do .env
 load_dotenv()
 
-# Cliente da OpenAI
-client = OpenAI()
+# Cliente da OpenAI (usa a variável OPENAI_API_KEY automaticamente)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def carregar_contexto():
     caminho = "scripts/contexto.txt"
