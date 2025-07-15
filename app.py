@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, request
 from services.gpt_service import gerar_resposta_com_gpt
 import requests
 import os
@@ -9,12 +9,15 @@ load_dotenv()
 
 app = Flask(__name__)
 
-historico = [
-    {
-        "mensagem": "Olá, tenho um precatório para vender.",
-        "resposta": "Olá! Posso te ajudar com isso 😊. Me diga o número do processo."
-    }
-]
+# Dicionário para armazenar mensagens agrupadas por telefone
+historico_por_telefone = {
+    "5581988881111": [
+        {
+            "mensagem": "Oi, tenho um precatório.",
+            "resposta": "Olá! Podemos te ajudar com isso. Qual o número do processo?"
+        }
+    ]
+}
 
 @app.route("/", methods=["GET"])
 def home():
@@ -23,14 +26,18 @@ def home():
 @app.route("/webhook", methods=["POST"])
 def receber_mensagem():
     dados = request.json
+    telefone = dados.get("telefone")
     mensagem_cliente = dados.get("mensagem")
 
-    if not mensagem_cliente:
-        return jsonify({"erro": "Mensagem não fornecida"}), 400
+    if not telefone or not mensagem_cliente:
+        return jsonify({"erro": "Telefone ou mensagem não fornecidos"}), 400
 
     resposta_gerada = gerar_resposta_com_gpt(mensagem_cliente)
 
-    historico.append({
+    if telefone not in historico_por_telefone:
+        historico_por_telefone[telefone] = []
+
+    historico_por_telefone[telefone].append({
         "mensagem": mensagem_cliente,
         "resposta": resposta_gerada
     })
@@ -39,12 +46,26 @@ def receber_mensagem():
 
 @app.route("/mensagens", methods=["GET"])
 def mensagens():
+    telefone_selecionado = request.args.get("telefone")
+    telefones = list(historico_por_telefone.keys())
+    mensagens = historico_por_telefone.get(telefone_selecionado, []) if telefone_selecionado else []
+
     html = """
     <html>
     <head>
         <title>Mensagens Recebidas - ProsperoJus</title>
         <style>
             body { font-family: Arial; padding: 20px; background-color: #f9f9f9; }
+            .abas { margin-bottom: 20px; }
+            .abas a {
+                margin-right: 10px;
+                padding: 8px 12px;
+                background-color: #eee;
+                border-radius: 5px;
+                text-decoration: none;
+                color: #333;
+            }
+            .abas a.selecionado { background-color: #ccc; font-weight: bold; }
             .card {
                 background-color: white;
                 padding: 15px;
@@ -71,7 +92,12 @@ def mensagens():
     </head>
     <body>
         <h1>📨 Mensagens Recebidas - ProsperoJus</h1>
-        {% for item in historico %}
+        <div class="abas">
+            {% for tel in telefones %}
+                <a href="/mensagens?telefone={{ tel }}" class="{% if tel == telefone_selecionado %}selecionado{% endif %}">{{ tel }}</a>
+            {% endfor %}
+        </div>
+        {% for item in mensagens %}
             <div class="card">
                 <strong>Mensagem recebida:</strong><br> {{ item.mensagem }}<br><br>
                 <strong>Sugestão de resposta:</strong>
@@ -79,6 +105,7 @@ def mensagens():
 
                 <form method="POST" action="/editar" id="form-{{ loop.index }}">
                     <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
+                    <input type="hidden" name="telefone" value="{{ telefone_selecionado }}">
                     <textarea name="resposta" id="resposta-input-{{ loop.index }}">{{ item.resposta }}</textarea>
                     <button type="button" onclick="ativarEdicao({{ loop.index }})" id="editar-btn-{{ loop.index }}">✏️ Editar</button>
                 </form>
@@ -87,20 +114,21 @@ def mensagens():
     </body>
     </html>
     """
-    return render_template_string(html, historico=historico)
+    return render_template_string(html, telefones=telefones, telefone_selecionado=telefone_selecionado, mensagens=mensagens)
 
 @app.route("/editar", methods=["POST"])
 def editar():
+    telefone = request.form.get("telefone")
     mensagem = request.form.get("mensagem")
     nova_resposta = request.form.get("resposta")
 
-    for item in historico:
+    for item in historico_por_telefone.get(telefone, []):
         if item["mensagem"] == mensagem:
             item["resposta"] = nova_resposta
             break
 
     atualizar_contexto_no_github()
-    return redirect(url_for('mensagens'))
+    return redirect(url_for('mensagens', telefone=telefone))
 
 def atualizar_contexto_no_github():
     token = os.getenv("GITHUB_TOKEN")
@@ -121,9 +149,13 @@ def atualizar_contexto_no_github():
 
     sha = r_get.json()["sha"]
 
-    novo_conteudo = "\n\n".join(
-        f"📩 {item['mensagem']}\n💬 {item['resposta']}" for item in historico
-    )
+    # Compila todas as respostas de todos os telefones
+    conteudo_total = []
+    for tel, mensagens in historico_por_telefone.items():
+        for item in mensagens:
+            conteudo_total.append(f"📩 {item['mensagem']}\n💬 {item['resposta']}")
+
+    novo_conteudo = "\n\n".join(conteudo_total)
 
     payload = {
         "message": "📝 Atualização automática do contexto.txt pelo bot",
@@ -134,7 +166,7 @@ def atualizar_contexto_no_github():
 
     r_put = requests.put(url_get, headers=headers, json=payload)
 
-    if r_put.status_code == 200 or r_put.status_code == 201:
+    if r_put.status_code in [200, 201]:
         print("✅ contexto.txt atualizado com sucesso no GitHub!")
     else:
         print("❌ Erro ao atualizar contexto.txt:", r_put.text)
