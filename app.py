@@ -38,10 +38,10 @@ def receber_mensagem():
         dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
     )
 
-    if isinstance(mensagem, dict):
-        mensagem = mensagem.get("message") or str(mensagem)
-
-    if isinstance(mensagem, str) and mensagem.startswith("{'message': "):
+    # Corrige mensagens no formato {'message': '...'}
+    if isinstance(mensagem, dict) and "message" in mensagem:
+        mensagem = mensagem["message"]
+    elif isinstance(mensagem, str) and mensagem.startswith("{'message':"):
         mensagem = mensagem.replace("{'message': '", "").rstrip("'}")
 
     resposta = ""
@@ -64,11 +64,13 @@ def receber_mensagem():
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
 
+    datahora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
     historico_por_telefone[numero].insert(0, {
         "mensagem": mensagem,
         "resposta": resposta,
         "html": Markup(markdown(resposta)),
-        "datahora": datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        "datahora": datahora
     })
 
     historico_por_telefone[numero] = historico_por_telefone[numero][:MAX_MENSAGENS]
@@ -93,8 +95,6 @@ def mensagens():
             .sugestao { margin-top: 10px; }
             textarea { width: 100%; height: 80px; display: none; margin-top: 10px; }
             button { margin-top: 5px; margin-right: 10px; cursor: pointer; padding: 5px 10px; border: none; border-radius: 5px; }
-            .btn-editar { background-color: #f9c74f; }
-            .btn-copiar { background-color: #90be6d; }
         </style>
         <script>
             function editar(id) {
@@ -125,11 +125,11 @@ def mensagens():
                     <div id="resposta-{{ loop.index }}">{{ item.html|safe }}</div>
                     <form method="POST" action="/editar">
                         <input type="hidden" name="telefone" value="{{ telefone }}">
-                        <input type="hidden" name="mensagem" value="{{ item.mensagem }}">
+                        <input type="hidden" name="datahora" value="{{ item.datahora }}">
                         <textarea name="nova_resposta" id="edit-{{ loop.index }}">{{ item.resposta }}</textarea>
-                        <button type="button" id="btn-editar-{{ loop.index }}" class="btn-editar" onclick="editar({{ loop.index }})">✏️ Editar</button>
-                        <button type="submit" id="btn-salvar-{{ loop.index }}" style="display:none;">💾 Salvar texto</button>
-                        <button type="button" class="btn-copiar" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
+                        <button type="button" id="btn-editar-{{ loop.index }}" style="background-color:#f9c74f;" onclick="editar({{ loop.index }})">✏️ Editar</button>
+                        <button type="submit" id="btn-salvar-{{ loop.index }}" style="display:none;background-color:#f9c74f;">💾 Salvar texto</button>
+                        <button type="button" style="background-color:#90be6d;" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
                     </form>
                 </div>
             </div>
@@ -142,11 +142,11 @@ def mensagens():
 @app.route("/editar", methods=["POST"])
 def editar():
     telefone = request.form.get("telefone")
-    mensagem_original = request.form.get("mensagem")
+    datahora = request.form.get("datahora")
     nova_resposta = request.form.get("nova_resposta")
 
     for item in historico_por_telefone.get(telefone, []):
-        if item['mensagem'] == mensagem_original:
+        if item['datahora'] == datahora:
             item['resposta'] = nova_resposta
             item['html'] = Markup(markdown(nova_resposta))
             break
