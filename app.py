@@ -154,7 +154,7 @@ def atualizar_contexto_no_github():
     conteudo_total = []
     for tel, lista in historico_por_telefone.items():
         for item in lista:
-            conteudo_total.append(f"📩 {item['mensagem']}\n💬 {item['resposta']}")
+            conteudo_total.append(f"📩 {item['mensagem']}\n {item['resposta']}")
     novo_texto = "\n\n".join(conteudo_total)
 
     payload = {
