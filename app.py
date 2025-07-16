@@ -45,7 +45,7 @@ def webhook():
     resposta = gerar_resposta_com_gpt(mensagem)
     datahora = datetime.now()
 
-    salvar_mensagem(numero, mensagem, datahora)
+    salvar_mensagem(numero, mensagem, resposta, datahora)
 
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
@@ -67,20 +67,40 @@ def mensagens():
     <html>
     <head>
         <meta charset='utf-8'>
-        <meta http-equiv="refresh" content="10">
+        <meta http-equiv="refresh" content="15">
         <title>📨 Mensagens - ProsperoJus</title>
         <style>
             body { font-family: Arial; padding: 20px; }
             .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; background: #f9f9f9; }
+            .botao { margin-top: 5px; margin-right: 10px; padding: 5px 10px; cursor: pointer; }
+            textarea { width: 100%; height: 100px; margin-top: 10px; }
         </style>
+        <script>
+            function copiarTexto(id) {
+                var texto = document.getElementById(id).textContent;
+                navigator.clipboard.writeText(texto).then(() => {
+                    alert("Texto copiado para a área de transferência!");
+                });
+            }
+        </script>
     </head>
     <body>
         <h2>📨 Mensagens Recebidas - ProsperoJus</h2>
-        {% for tel, msg, data in registros %}
+        {% for tel, msg, resposta, data in registros %}
             <div class="card">
                 <div><strong>📱 {{ tel }}</strong></div>
                 <div><strong>📧 Mensagem:</strong> {{ msg }}</div>
-                <div><em>{{ data }}</em></div>
+                <div><strong> Resposta sugerida:</strong></div>
+                <div id="resposta_{{ loop.index }}">{{ resposta or "⚠️ Resposta ainda não gerada." }}</div>
+                <em>{{ data }}</em>
+                <form method="POST" action="/editar">
+                    <input type="hidden" name="telefone" value="{{ tel }}">
+                    <input type="hidden" name="datahora" value="{{ data }}">
+                    <textarea name="nova_resposta">{{ resposta or "" }}</textarea>
+                    <br>
+                    <button type="submit" class="botao">✏️ Editar Resposta</button>
+                    <button type="button" class="botao" onclick="copiarTexto('resposta_{{ loop.index }}')">📋 Copiar</button>
+                </form>
             </div>
         {% endfor %}
     </body>
