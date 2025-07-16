@@ -15,24 +15,24 @@ def get_connection():
         port=os.getenv("DB_PORT", 5432)
     )
 
-# 💾 Função para salvar mensagem + resposta no banco
+# 💾 Função para salvar mensagem no banco
 def salvar_mensagem(telefone, mensagem, resposta, data_recebimento):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO mensagens (telefone, mensagem, resposta, data_recebimento, created_at)
-        VALUES (%s, %s, %s, %s, NOW())
+        INSERT INTO mensagens (telefone, mensagem, resposta, data_recebimento)
+        VALUES (%s, %s, %s, %s)
     """, (telefone, mensagem, resposta, data_recebimento))
     conn.commit()
     cursor.close()
     conn.close()
 
-# 📤 Função para listar mensagens recentes (com resposta)
+# 📤 Função para listar mensagens recentes
 def listar_mensagens(limit=50):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT telefone, mensagem, resposta, data_recebimento
+        SELECT telefone, mensagem, data_recebimento
         FROM mensagens
         ORDER BY data_recebimento DESC
         LIMIT %s
