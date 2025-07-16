@@ -40,7 +40,7 @@ def webhook():
         mensagem = mensagem.replace("{'message': '", "").rstrip("'}")
 
     if not numero or not mensagem:
-        return jsonify({"erro": "N\u00famero ou mensagem ausente"}), 400
+        return jsonify({"erro": "Número ou mensagem ausente"}), 400
 
     resposta = gerar_resposta_com_gpt(mensagem)
     datahora = datetime.now()
@@ -68,18 +68,18 @@ def mensagens():
     <head>
         <meta charset='utf-8'>
         <meta http-equiv="refresh" content="10">
-        <title>\ud83d\udce8 Mensagens - ProsperoJus</title>
+        <title>📨 Mensagens - ProsperoJus</title>
         <style>
             body { font-family: Arial; padding: 20px; }
             .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; background: #f9f9f9; }
         </style>
     </head>
     <body>
-        <h2>\ud83d\udce8 Mensagens Recebidas - ProsperoJus</h2>
+        <h2>📨 Mensagens Recebidas - ProsperoJus</h2>
         {% for tel, msg, data in registros %}
             <div class="card">
-                <div><strong>\ud83d\udcf2 {{ tel }}</strong></div>
-                <div><strong>\ud83d\udce7 Mensagem:</strong> {{ msg }}</div>
+                <div><strong>📱 {{ tel }}</strong></div>
+                <div><strong>📧 Mensagem:</strong> {{ msg }}</div>
                 <div><em>{{ data }}</em></div>
             </div>
         {% endfor %}
@@ -123,17 +123,17 @@ def atualizar_contexto_no_github():
     conteudo_total = []
     for tel, lista in historico_por_telefone.items():
         for item in lista:
-            conteudo_total.append(f"\ud83d\udce9 {item['mensagem']}\n {item['resposta']}")
+            conteudo_total.append(f"📩 {item['mensagem']}\n {item['resposta']}")
     novo_texto = "\n\n".join(conteudo_total)
 
     payload = {
-        "message": "\ud83d\udcdd Atualiza\u00e7\u00e3o autom\u00e1tica do contexto.txt",
+        "message": "📝 Atualização automática do contexto.txt",
         "content": base64.b64encode(novo_texto.encode()).decode("utf-8"),
         "sha": sha,
         "branch": branch
     }
     r_put = requests.put(f"https://api.github.com/repos/{repo}/contents/{path}", headers=headers, json=payload)
-    print("\u2705 Atualiza\u00e7\u00e3o GitHub status:", r_put.status_code)
+    print("✅ Atualização GitHub status:", r_put.status_code)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
