@@ -2,10 +2,10 @@ import os
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente do .env
+# Carrega variáveis do .env
 load_dotenv()
 
-# Cliente da OpenAI (usa a variável OPENAI_API_KEY automaticamente)
+# Cliente da OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def carregar_contexto():
@@ -36,8 +36,10 @@ def gerar_resposta_com_gpt(mensagem_usuario):
             temperature=0.7,
             max_tokens=700
         )
-        return resposta.choices[0].message.content.strip()
+
+        conteudo = resposta.choices[0].message.content.strip()
+        return conteudo if conteudo else None
 
     except Exception as e:
-        print(f"Erro ao chamar OpenAI: {e}")
-        return "⚠️ Tivemos um problema ao gerar a resposta. Pode tentar novamente em instantes?"
+        print("❌ Erro ao chamar OpenAI:", e)
+        return None

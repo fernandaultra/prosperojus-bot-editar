@@ -18,7 +18,7 @@ MAX_MENSAGENS = 10
 
 @app.route("/", methods=["GET"])
 def home():
-    return u"<h2>🚀 ProsperoJus Bot está rodando com sucesso!</h2>", 200
+    return "<h2>🚀 ProsperoJus Bot está rodando com sucesso!</h2>", 200
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -54,7 +54,7 @@ def webhook():
         "mensagem": mensagem,
         "resposta": resposta,
         "html": Markup(markdown(resposta)),
-        "datahora": datahora.strftime("%d/%m/%Y %H:%M:%S")
+        "datahora": datahora.strftime("%Y-%m-%d %H:%M:%S.%f")
     })
 
     historico_por_telefone[numero] = historico_por_telefone[numero][:MAX_MENSAGENS]
@@ -62,51 +62,66 @@ def webhook():
 
 @app.route("/mensagens", methods=["GET"])
 def mensagens():
-    registros = listar_mensagens()
+    telefone = request.args.get("telefone")
+    telefones = list(historico_por_telefone.keys())
+    mensagens = historico_por_telefone.get(telefone, [])
+
     html = """
     <html>
     <head>
         <meta charset='utf-8'>
-        <meta http-equiv="refresh" content="15">
+        <meta http-equiv="refresh" content="10">
         <title>📨 Mensagens - ProsperoJus</title>
         <style>
             body { font-family: Arial; padding: 20px; }
+            .abas a { margin-right: 10px; text-decoration: none; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
             .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; background: #f9f9f9; }
-            .botao { margin-top: 5px; margin-right: 10px; padding: 5px 10px; cursor: pointer; }
-            textarea { width: 100%; height: 100px; margin-top: 10px; }
+            .sugestao { margin-top: 10px; }
+            textarea { width: 100%; height: 100px; display: none; margin-top: 10px; }
+            button { margin-top: 5px; margin-right: 10px; cursor: pointer; padding: 6px 12px; border: none; border-radius: 5px; }
         </style>
         <script>
+            function editar(id) {
+                document.getElementById('resposta-'+id).style.display = 'none';
+                document.getElementById('edit-'+id).style.display = 'block';
+                document.getElementById('btn-editar-'+id).style.display = 'none';
+                document.getElementById('btn-salvar-'+id).style.display = 'inline';
+            }
             function copiarTexto(id) {
-                var texto = document.getElementById(id).textContent;
-                navigator.clipboard.writeText(texto).then(() => {
-                    alert("Texto copiado para a área de transferência!");
-                });
+                navigator.clipboard.writeText(document.getElementById(id).innerText);
+                alert('Texto copiado!');
             }
         </script>
     </head>
     <body>
         <h2>📨 Mensagens Recebidas - ProsperoJus</h2>
-        {% for tel, msg, resposta, data in registros %}
+        <div class="abas">
+            {% for tel in telefones %}
+                <a href="/mensagens?telefone={{ tel }}">{{ tel }}</a>
+            {% endfor %}
+        </div>
+        {% for item in mensagens %}
             <div class="card">
-                <div><strong>📱 {{ tel }}</strong></div>
-                <div><strong>📧 Mensagem:</strong> {{ msg }}</div>
-                <div><strong> Resposta sugerida:</strong></div>
-                <div id="resposta_{{ loop.index }}">{{ resposta or "⚠️ Resposta ainda não gerada." }}</div>
-                <em>{{ data }}</em>
-                <form method="POST" action="/editar">
-                    <input type="hidden" name="telefone" value="{{ tel }}">
-                    <input type="hidden" name="datahora" value="{{ data }}">
-                    <textarea name="nova_resposta">{{ resposta or "" }}</textarea>
-                    <br>
-                    <button type="submit" class="botao">✏️ Editar Resposta</button>
-                    <button type="button" class="botao" onclick="copiarTexto('resposta_{{ loop.index }}')">📋 Copiar</button>
-                </form>
+                <div><strong>📅 {{ item.datahora }}</strong></div>
+                <div><strong>📥 Mensagem:</strong> {{ item.mensagem }}</div>
+                <div class="sugestao">
+                    <strong>🤖 Sugestão:</strong>
+                    <div id="resposta-{{ loop.index }}">{{ item.html|safe }}</div>
+                    <form method="POST" action="/editar">
+                        <input type="hidden" name="telefone" value="{{ telefone }}">
+                        <input type="hidden" name="datahora" value="{{ item.datahora }}">
+                        <textarea name="nova_resposta" id="edit-{{ loop.index }}">{{ item.resposta }}</textarea>
+                        <button type="button" id="btn-editar-{{ loop.index }}" style="background-color:#f9c74f;" onclick="editar({{ loop.index }})">✏️ Editar</button>
+                        <button type="submit" id="btn-salvar-{{ loop.index }}" style="display:none;background-color:#f9c74f;">📎 Salvar texto</button>
+                        <button type="button" style="background-color:#90be6d;" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
+                    </form>
+                </div>
             </div>
         {% endfor %}
     </body>
     </html>
     """
-    return render_template_string(html, registros=registros)
+    return render_template_string(html, telefones=telefones, telefone=telefone, mensagens=mensagens)
 
 @app.route("/editar", methods=["POST"])
 def editar():
