@@ -18,7 +18,7 @@ MAX_MENSAGENS = 10
 
 @app.route("/", methods=["GET"])
 def home():
-    return "<h2>\ud83d\ude80 ProsperoJus Bot est\u00e1 rodando com sucesso!</h2>", 200
+    return u"<h2>🚀 ProsperoJus Bot está rodando com sucesso!</h2>", 200
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
