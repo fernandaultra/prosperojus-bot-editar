@@ -2,7 +2,15 @@ services:
   - type: web
     name: prosperojus-bot
     env: python
-    plan: free
+    plan: professional
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python app.py"
+    autoDeploy: true
+
+  - type: worker
+    name: prosperojus-sheets-worker
+    env: python
+    plan: professional
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python agendador.py"
     autoDeploy: true
