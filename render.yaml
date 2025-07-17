@@ -5,7 +5,6 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
     autoDeploy: true
-    plan: free  # ou starter, dependendo do plano desejado
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -16,9 +15,8 @@ services:
 
   - type: worker
     name: prosperojus-sheets-worker
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python agendador.py"
+    env: docker
+    dockerfilePath: ./Dockerfile
     autoDeploy: true
     envVars:
       - key: GOOGLE_SHEETS_CREDENTIALS_JSON
