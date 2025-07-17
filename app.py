@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from services.gpt_service import gerar_resposta_com_gpt
-from services.db import salvar_mensagem, listar_mensagens
+from services.sheets_service import salvar_mensagem, listar_mensagens
 from utils.audio_utils import download_audio
 from datetime import datetime
 from markdown import markdown

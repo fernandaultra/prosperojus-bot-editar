@@ -10,15 +10,20 @@ services:
         sync: false
       - key: ZAPI_TOKEN
         sync: false
-      - key: DATABASE_URL
+      - key: GOOGLE_SHEETS_CREDENTIALS_JSON
+        sync: false
+      - key: PLANILHA_ID
         sync: false
 
   - type: worker
-    name: prosperojus-sheets-worker
-    env: docker
-    dockerfilePath: ./Dockerfile
+    name: prosperojus-worker-agendador
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python agendador.py"
     autoDeploy: true
     envVars:
+      - key: OPENAI_API_KEY
+        sync: false
       - key: GOOGLE_SHEETS_CREDENTIALS_JSON
         sync: false
       - key: PLANILHA_ID

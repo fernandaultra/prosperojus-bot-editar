@@ -5,13 +5,18 @@ from dotenv import load_dotenv
 # Carrega variáveis do .env
 load_dotenv()
 
+# Recupera chave da API
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("❌ Variável de ambiente 'OPENAI_API_KEY' não definida.")
+
 # Cliente da OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 def carregar_contexto():
     caminho = "contexto.txt"
     if not os.path.exists(caminho):
-        raise FileNotFoundError(f"Arquivo de contexto não encontrado: {caminho}")
+        raise FileNotFoundError(f"❌ Arquivo de contexto não encontrado: {caminho}")
     with open(caminho, "r", encoding="utf-8") as f:
         return f.read()
 
@@ -30,7 +35,7 @@ def gerar_resposta_com_gpt(mensagem_usuario):
         resposta = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Você é um atendente da equipe comercial da ProsperoJus, especialista em negociação de precatórios."},
+                {"role": "system", "content": "Você é Amanda Mariano, advogada (OAB 18.020), especialista em negociação de precatórios pela ProsperoJus."},
                 {"role": "user", "content": prompt_final}
             ],
             temperature=0.7,

@@ -1,19 +1,26 @@
-# Ignorar pastas e arquivos gerados pelo Python
+# 🐍 Arquivos gerados pelo Python
 __pycache__/
 *.pyc
 *.pyo
 
-# Arquivos de ambiente virtual
+# 🌱 Ambientes virtuais
 .env
 .venv/
 venv/
-
-# Arquivo de credenciais (não deve ir para o GitHub!)
-credenciais.json
-
-# Configurações do PyCharm
-.idea/
-
-# Evitar erros com nomes mal digitados
 env/
 ENV/
+
+# 🔐 Arquivos sensíveis de autenticação
+credenciais.json
+*.key
+*.pem
+
+# 🔧 Configurações locais do PyCharm/IDE
+.idea/
+
+# 📜 Scripts e respostas locais (caso use respostas fixas)
+scripts/respostas.json
+
+# 🗃️ Arquivos temporários ou locais
+.DS_Store
+*.log
