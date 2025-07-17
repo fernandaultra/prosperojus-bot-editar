@@ -1,21 +1,18 @@
-import pandas as pd
-import gspread
 import os
 import json
-from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from services.db import listar_mensagens  # Importa função do seu db.py
 
-# 🔐 Autenticação com Google Sheets usando variável de ambiente
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
-# Lê o conteúdo JSON da variável de ambiente
+# 🔐 Carrega as credenciais da variável de ambiente
 creds_json = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_json, scope)
-client = gspread.authorize(creds)
+scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = service_account.Credentials.from_service_account_info(creds_json, scopes=scopes)
 
 # 📄 Informações da planilha
-planilha_id = os.environ["PLANILHA_ID"]
-nome_aba = "Página1"
+spreadsheet_id = os.environ["PLANILHA_ID"]
+range_name = "Página1!A1"
 
 # 📥 Consulta ao banco de dados
 mensagens = listar_mensagens(limit=100)
@@ -24,12 +21,28 @@ mensagens = listar_mensagens(limit=100)
 df = pd.DataFrame(mensagens, columns=["Telefone", "Mensagem", "Data Recebimento"])
 df = df.astype(str)
 
-# 🔗 Abre a planilha e aba
-spreadsheet = client.open_by_key(planilha_id)
-worksheet = spreadsheet.worksheet(nome_aba)
+# 🔗 Inicializa o serviço do Google Sheets
+service = build("sheets", "v4", credentials=creds)
 
-# 🧹 Limpa e atualiza
-worksheet.clear()
-worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+# 🧹 Limpa conteúdo antigo e atualiza com novos dados
+# 1. Limpa a aba
+clear_body = {}
+service.spreadsheets().values().clear(
+    spreadsheetId=spreadsheet_id,
+    range=range_name,
+    body=clear_body
+).execute()
 
-print("✅ Dados do banco enviados com sucesso para o Google Sheets!")
+# 2. Prepara e envia os novos dados
+body = {
+    "values": [df.columns.tolist()] + df.values.tolist()
+}
+
+result = service.spreadsheets().values().update(
+    spreadsheetId=spreadsheet_id,
+    range=range_name,
+    valueInputOption="RAW",
+    body=body
+).execute()
+
+print(f"✅ {result.get('updatedCells')} células atualizadas com sucesso no Google Sheets.")
