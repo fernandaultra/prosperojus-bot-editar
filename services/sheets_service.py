@@ -53,3 +53,23 @@ def atualizar_resposta(linha, resposta, datahora):
     ).execute()
 
     print(f"✅ {result.get('updatedCells')} células atualizadas na linha {linha}.")
+
+# Insere nova linha com mensagem recebida e resposta
+def salvar_mensagem(telefone, mensagem, resposta, datahora):
+    spreadsheet_id = os.environ["PLANILHA_ID"]
+    range_name = "Página1!A:D"  # Inserção em todas as colunas
+
+    service = get_sheets_service()
+    body = {
+        "values": [[telefone, mensagem, resposta, str(datahora)]]
+    }
+
+    result = service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id,
+        range=range_name,
+        valueInputOption="RAW",
+        insertDataOption="INSERT_ROWS",
+        body=body
+    ).execute()
+
+    print(f"✅ Mensagem salva na planilha. {result.get('updates', {}).get('updatedCells', 0)} células adicionadas.")
