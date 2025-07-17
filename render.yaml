@@ -2,6 +2,7 @@ services:
   - type: web
     name: prosperojus-bot
     env: python
+    pythonVersion: 3.10
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python app.py"
     autoDeploy: true
@@ -9,6 +10,7 @@ services:
   - type: worker
     name: prosperojus-sheets-worker
     env: python
+    pythonVersion: 3.10
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python agendador.py"
     autoDeploy: true
