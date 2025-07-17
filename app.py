@@ -45,8 +45,10 @@ def webhook():
     resposta = gerar_resposta_com_gpt(mensagem)
     datahora = datetime.now()
 
+    # Salva na planilha
     salvar_mensagem(numero, mensagem, resposta, datahora)
 
+    # Salva no histórico local (usado pela interface /mensagens)
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
 
