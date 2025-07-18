@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from services.gpt_service import gerar_resposta_com_gpt
-from services.sheets_service import salvar_mensagem, listar_mensagens
+from services.sheets_service import salvar_mensagem
 from utils.audio_utils import download_audio
 from datetime import datetime
 from markdown import markdown
@@ -25,8 +25,6 @@ def webhook():
     dados = request.get_json(force=True)
 
     numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
-
-    # 🛡️ Leitura segura da mensagem
     mensagem = None
 
     for chave in ["message", "body", "text"]:
@@ -52,8 +50,15 @@ def webhook():
     resposta = gerar_resposta_com_gpt(mensagem)
     datahora = datetime.now()
 
-    salvar_mensagem(numero, mensagem, resposta, datahora)
+    # ✅ Salva no Google Sheets
+    salvar_mensagem({
+        "timestamp": datahora.strftime('%Y-%m-%d %H:%M:%S'),
+        "remetente": numero,
+        "mensagem": mensagem,
+        "resposta_sugerida": resposta
+    })
 
+    # Salva no histórico em memória
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
 
