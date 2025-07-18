@@ -13,8 +13,12 @@ from dotenv import load_dotenv
 app = Flask(__name__)
 load_dotenv()
 
-# ✅ Carrega histórico diretamente do Google Sheets
+# ✅ Carrega histórico com Markdown renderizado
 historico_por_telefone = listar_mensagens()
+for lista in historico_por_telefone.values():
+    for item in lista:
+        item["html"] = Markup(markdown(item["resposta"])) if item.get("resposta") else ""
+
 MAX_MENSAGENS = 10
 
 @app.route("/", methods=["GET"])
@@ -64,7 +68,8 @@ def webhook():
     historico_por_telefone[numero].insert(0, {
         "mensagem": mensagem,
         "resposta": resposta,
-        "datahora": datahora.strftime("%Y-%m-%d %H:%M:%S")
+        "datahora": datahora.strftime("%Y-%m-%d %H:%M:%S"),
+        "html": Markup(markdown(resposta))
     })
 
     historico_por_telefone[numero] = historico_por_telefone[numero][:MAX_MENSAGENS]
@@ -116,7 +121,7 @@ def mensagens():
                 <div><strong>📥 Mensagem:</strong> {{ item.mensagem }}</div>
                 <div class="sugestao">
                     <strong>🤖 Sugestão:</strong>
-                    <div id="resposta-{{ loop.index }}">{{ item.resposta }}</div>
+                    <div id="resposta-{{ loop.index }}">{{ item.html|safe }}</div>
                     <form method="POST" action="/editar">
                         <input type="hidden" name="telefone" value="{{ telefone }}">
                         <input type="hidden" name="datahora" value="{{ item.datahora }}">
@@ -142,6 +147,7 @@ def editar():
     for item in historico_por_telefone.get(telefone, []):
         if item['datahora'] == datahora:
             item['resposta'] = nova_resposta
+            item['html'] = Markup(markdown(nova_resposta))
             break
 
     atualizar_contexto_no_github()
