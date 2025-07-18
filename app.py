@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for
 from services.gpt_service import gerar_resposta_com_gpt
-from services.sheets_service import salvar_mensagem
+from services.sheets_service import salvar_mensagem, listar_mensagens
 from utils.audio_utils import download_audio
 from datetime import datetime
 from markdown import markdown
@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 app = Flask(__name__)
 load_dotenv()
 
-historico_por_telefone = {}
+# ✅ Agora o histórico vem da planilha diretamente
+historico_por_telefone = listar_mensagens()
 MAX_MENSAGENS = 10
 
 @app.route("/", methods=["GET"])
@@ -50,7 +51,6 @@ def webhook():
     resposta = gerar_resposta_com_gpt(mensagem)
     datahora = datetime.now()
 
-    # ✅ Salva no Google Sheets
     salvar_mensagem({
         "timestamp": datahora.strftime('%Y-%m-%d %H:%M:%S'),
         "remetente": numero,
@@ -58,7 +58,6 @@ def webhook():
         "resposta_sugerida": resposta
     })
 
-    # Salva no histórico em memória
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
 

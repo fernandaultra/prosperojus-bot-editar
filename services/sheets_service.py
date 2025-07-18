@@ -3,18 +3,20 @@ import json
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from markdown import markdown
+from markupsafe import Markup
 
-# Inicializa conexão com Google Sheets
+# 🔐 Autentica e retorna o serviço do Google Sheets
 def get_sheets_service():
     creds_json = json.loads(os.environ["GOOGLE_SHEETS_CREDENTIALS_JSON"])
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
     creds = service_account.Credentials.from_service_account_info(creds_json, scopes=scopes)
     return build("sheets", "v4", credentials=creds)
 
-# Lê as mensagens da planilha e retorna como lista de dicionários
-def listar_mensagens(limit=100):
+# 📥 Lista mensagens para uso no painel /mensagens
+def listar_mensagens():
     spreadsheet_id = os.environ["PLANILHA_ID"]
-    range_name = "Página1!A2:D"  # A:Telefone, B:Mensagem, C:Resposta, D:DataHora
+    range_name = "Página1!A2:D"  # A: Telefone | B: Mensagem | C: Resposta | D: DataHora
 
     service = get_sheets_service()
     result = service.spreadsheets().values().get(
@@ -22,23 +24,34 @@ def listar_mensagens(limit=100):
         range=range_name
     ).execute()
 
-    values = result.get("values", [])[:limit]
+    values = result.get("values", [])
 
-    mensagens = []
+    mensagens = {}
     for row in values:
-        mensagens.append({
-            "Telefone": row[0] if len(row) > 0 else "",
-            "Mensagem": row[1] if len(row) > 1 else "",
-            "Resposta": row[2] if len(row) > 2 else "",
-            "DataHora": row[3] if len(row) > 3 else ""
+        telefone = row[0] if len(row) > 0 else ""
+        mensagem = row[1] if len(row) > 1 else ""
+        resposta = row[2] if len(row) > 2 else ""
+        datahora = row[3] if len(row) > 3 else ""
+
+        if not telefone:
+            continue
+
+        if telefone not in mensagens:
+            mensagens[telefone] = []
+
+        mensagens[telefone].insert(0, {
+            "mensagem": mensagem,
+            "resposta": resposta,
+            "html": Markup(markdown(resposta)),
+            "datahora": datahora
         })
 
     return mensagens
 
-# Atualiza a resposta e data/hora na planilha
+# 🧾 Atualiza resposta e datahora (usado no agendador, se necessário)
 def atualizar_resposta(linha, resposta, datahora):
     spreadsheet_id = os.environ["PLANILHA_ID"]
-    range_name = f"Página1!C{linha}:D{linha}"  # Coluna C: Resposta | D: DataHora
+    range_name = f"Página1!C{linha}:D{linha}"
 
     service = get_sheets_service()
     body = {
@@ -54,13 +67,20 @@ def atualizar_resposta(linha, resposta, datahora):
 
     print(f"✅ {result.get('updatedCells')} células atualizadas na linha {linha}.")
 
-# Insere nova linha com mensagem recebida e resposta
-def salvar_mensagem(telefone, mensagem, resposta, datahora):
+# 💾 Salva mensagem (adaptado para dict único)
+def salvar_mensagem(dados):
     spreadsheet_id = os.environ["PLANILHA_ID"]
     range_name = "Página1!A:D"
 
     service = get_sheets_service()
-    values = [[telefone, mensagem, resposta, datahora.strftime("%Y-%m-%d %H:%M:%S")]]
+
+    values = [[
+        dados.get("remetente", ""),
+        dados.get("mensagem", ""),
+        dados.get("resposta_sugerida", ""),
+        dados.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    ]]
+
     body = {"values": values}
 
     result = service.spreadsheets().values().append(
