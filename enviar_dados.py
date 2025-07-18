@@ -1,4 +1,5 @@
 import logging
+import time
 import requests
 from services.sheets_service import listar_mensagens
 
@@ -30,8 +31,10 @@ def enviar_respostas():
                 except Exception as e:
                     logging.error(f"❌ Erro ao enviar requisição: {e}")
 
-    logging.info(f"📊 Total de mensagens processadas: {processadas}")
+                # ⏱️ Pausa para evitar sobrecarga ou rate limit
+                time.sleep(2)
 
+    logging.info(f"📊 Total de mensagens processadas: {processadas}")
 
 if __name__ == "__main__":
     enviar_respostas()
