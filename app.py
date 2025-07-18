@@ -5,7 +5,6 @@ from utils.audio_utils import download_audio
 from datetime import datetime
 from markdown import markdown
 from markupsafe import Markup
-import pytz
 import os
 import base64
 import requests
@@ -21,7 +20,6 @@ for lista in historico_por_telefone.values():
         item["html"] = Markup(markdown(item["resposta"])) if item.get("resposta") else ""
 
 MAX_MENSAGENS = 10
-brasilia = pytz.timezone("America/Sao_Paulo")
 
 @app.route("/", methods=["GET"])
 def home():
@@ -30,9 +28,10 @@ def home():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     dados = request.get_json(force=True)
-    numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
 
+    numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
     mensagem = None
+
     for chave in ["message", "body", "text"]:
         valor = dados.get(chave)
         if isinstance(valor, str):
@@ -54,7 +53,7 @@ def webhook():
         return jsonify({"erro": "Número ou mensagem ausente"}), 400
 
     resposta = gerar_resposta_com_gpt(mensagem)
-    datahora = datetime.now(brasilia)
+    datahora = datetime.now()
 
     salvar_mensagem({
         "timestamp": datahora.strftime('%Y-%m-%d %H:%M:%S'),
@@ -82,30 +81,32 @@ def mensagens():
     telefones = list(historico_por_telefone.keys())
     mensagens = historico_por_telefone.get(telefone, [])
 
-    html = """<!DOCTYPE html>
-    <html><head><meta charset='utf-8'>
-    <meta http-equiv="refresh" content="10">
-    <title>📨 Mensagens - ProsperoJus</title>
-    <style>
-        body { font-family: Arial; padding: 20px; }
-        .abas a { margin-right: 10px; text-decoration: none; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-        .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; background: #f9f9f9; }
-        .sugestao { margin-top: 10px; }
-        textarea { width: 100%; height: 100px; display: none; margin-top: 10px; }
-        button { margin-top: 5px; margin-right: 10px; cursor: pointer; padding: 6px 12px; border: none; border-radius: 5px; }
-    </style>
-    <script>
-        function editar(id) {
-            document.getElementById('resposta-'+id).style.display = 'none';
-            document.getElementById('edit-'+id).style.display = 'block';
-            document.getElementById('btn-editar-'+id).style.display = 'none';
-            document.getElementById('btn-salvar-'+id).style.display = 'inline';
-        }
-        function copiarTexto(id) {
-            navigator.clipboard.writeText(document.getElementById(id).innerText);
-            alert('Texto copiado!');
-        }
-    </script>
+    html = """
+    <html>
+    <head>
+        <meta charset='utf-8'>
+        <meta http-equiv="refresh" content="10">
+        <title>📨 Mensagens - ProsperoJus</title>
+        <style>
+            body { font-family: Arial; padding: 20px; }
+            .abas a { margin-right: 10px; text-decoration: none; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+            .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; background: #f9f9f9; }
+            .sugestao { margin-top: 10px; }
+            textarea { width: 100%; height: 100px; display: none; margin-top: 10px; }
+            button { margin-top: 5px; margin-right: 10px; cursor: pointer; padding: 6px 12px; border: none; border-radius: 5px; }
+        </style>
+        <script>
+            function editar(id) {
+                document.getElementById('resposta-'+id).style.display = 'none';
+                document.getElementById('edit-'+id).style.display = 'block';
+                document.getElementById('btn-editar-'+id).style.display = 'none';
+                document.getElementById('btn-salvar-'+id).style.display = 'inline';
+            }
+            function copiarTexto(id) {
+                navigator.clipboard.writeText(document.getElementById(id).innerText);
+                alert('Texto copiado!');
+            }
+        </script>
     </head>
     <body>
         <h2>📨 Mensagens Recebidas - ProsperoJus</h2>
@@ -132,7 +133,8 @@ def mensagens():
                 </div>
             </div>
         {% endfor %}
-    </body></html>
+    </body>
+    </html>
     """
     return render_template_string(html, telefones=telefones, telefone=telefone, mensagens=mensagens)
 
