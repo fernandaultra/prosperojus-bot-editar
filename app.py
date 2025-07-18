@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 app = Flask(__name__)
 load_dotenv()
 
-# ✅ Agora o histórico vem da planilha diretamente
+# ✅ Carrega histórico diretamente do Google Sheets
 historico_por_telefone = listar_mensagens()
 MAX_MENSAGENS = 10
 
@@ -64,8 +64,7 @@ def webhook():
     historico_por_telefone[numero].insert(0, {
         "mensagem": mensagem,
         "resposta": resposta,
-        "html": Markup(markdown(resposta)),
-        "datahora": datahora.strftime("%Y-%m-%d %H:%M:%S.%f")
+        "datahora": datahora.strftime("%Y-%m-%d %H:%M:%S")
     })
 
     historico_por_telefone[numero] = historico_por_telefone[numero][:MAX_MENSAGENS]
@@ -117,7 +116,7 @@ def mensagens():
                 <div><strong>📥 Mensagem:</strong> {{ item.mensagem }}</div>
                 <div class="sugestao">
                     <strong>🤖 Sugestão:</strong>
-                    <div id="resposta-{{ loop.index }}">{{ item.html|safe }}</div>
+                    <div id="resposta-{{ loop.index }}">{{ item.resposta }}</div>
                     <form method="POST" action="/editar">
                         <input type="hidden" name="telefone" value="{{ telefone }}">
                         <input type="hidden" name="datahora" value="{{ item.datahora }}">
@@ -143,7 +142,6 @@ def editar():
     for item in historico_por_telefone.get(telefone, []):
         if item['datahora'] == datahora:
             item['resposta'] = nova_resposta
-            item['html'] = Markup(markdown(nova_resposta))
             break
 
     atualizar_contexto_no_github()
