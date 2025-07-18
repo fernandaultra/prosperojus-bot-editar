@@ -26,13 +26,20 @@ def webhook():
 
     numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
 
-    mensagem = (
-        dados.get("message") or
-        dados.get("body") or
-        dados.get("text") or
-        dados.get("text", {}).get("message") or
-        dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
-    )
+    # 🛡️ Leitura segura da mensagem
+    mensagem = None
+
+    for chave in ["message", "body", "text"]:
+        valor = dados.get(chave)
+        if isinstance(valor, str):
+            mensagem = valor
+            break
+        if isinstance(valor, dict) and "message" in valor:
+            mensagem = valor["message"]
+            break
+
+    if not mensagem:
+        mensagem = dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
 
     if isinstance(mensagem, dict) and "message" in mensagem:
         mensagem = mensagem["message"]
@@ -45,10 +52,8 @@ def webhook():
     resposta = gerar_resposta_com_gpt(mensagem)
     datahora = datetime.now()
 
-    # Salva na planilha
     salvar_mensagem(numero, mensagem, resposta, datahora)
 
-    # Salva no histórico local (usado pela interface /mensagens)
     if numero not in historico_por_telefone:
         historico_por_telefone[numero] = []
 
