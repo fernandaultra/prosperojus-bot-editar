@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -10,10 +11,10 @@ def get_sheets_service():
     creds = service_account.Credentials.from_service_account_info(creds_json, scopes=scopes)
     return build("sheets", "v4", credentials=creds)
 
-# ✅ Lê as mensagens da planilha e retorna agrupadas por telefone
+# ✅ Lê e filtra mensagens não processadas, ordena por data e limita a 10 por telefone
 def listar_mensagens(limit=1000):
     spreadsheet_id = os.environ["PLANILHA_ID"]
-    range_name = "Página1!A2:G"  # A:Telefone | B:Mensagem | C:Resposta | D:DataHora | E/F/... | G:Processado
+    range_name = "Página1!A2:G"  # A:Telefone | B:Mensagem | C:Resposta | D:DataHora | ... | G:Processado
 
     service = get_sheets_service()
     result = service.spreadsheets().values().get(
@@ -31,16 +32,24 @@ def listar_mensagens(limit=1000):
         datahora = row[3] if len(row) > 3 else ""
         processado = row[6].strip().lower() == "ok" if len(row) > 6 else False
 
-        if telefone:
-            if telefone not in historico:
-                historico[telefone] = []
-            historico[telefone].append({
-                "linha": idx + 2,
-                "mensagem": mensagem,
-                "resposta": resposta,
-                "datahora": datahora,
-                "processado": processado
-            })
+        if not telefone or not mensagem or not datahora or processado:
+            continue  # pula se já estiver processado ou campos incompletos
+
+        if telefone not in historico:
+            historico[telefone] = []
+
+        historico[telefone].append({
+            "linha": idx + 2,
+            "mensagem": mensagem,
+            "resposta": resposta,
+            "datahora": datahora,
+            "processado": processado
+        })
+
+    # Ordena por data/hora decrescente e mantém apenas as 10 mais recentes por telefone
+    for tel, mensagens in historico.items():
+        mensagens.sort(key=lambda x: datetime.strptime(x["datahora"], "%Y-%m-%d %H:%M:%S"), reverse=True)
+        historico[tel] = mensagens[:10]
 
     return historico
 
@@ -75,7 +84,7 @@ def marcar_como_processado(linha, resposta, datahora):
 
     service = get_sheets_service()
     body = {
-        "values": [[resposta, datahora, "", "", "OK"]]  # Mantém colunas intermediárias em branco
+        "values": [[resposta, datahora, "", "", "OK"]]
     }
 
     result = service.spreadsheets().values().update(
