@@ -17,9 +17,10 @@ load_dotenv()
 # 🕒 Fuso horário de Brasília
 brasilia = pytz.timezone("America/Sao_Paulo")
 
-# 🔄 Carrega histórico inicial com fallback de resposta e Markdown
+# 🔄 Carrega histórico inicial do Google Sheets
 historico_por_telefone = listar_mensagens()
 for lista in historico_por_telefone.values():
+    lista.sort(key=lambda x: x.get("datahora", ""), reverse=True)  # ✅ Organiza da mais recente p/ mais antiga
     for item in lista:
         item["html"] = Markup(markdown(item.get("resposta") or "*[❌ Sem resposta]*"))
 

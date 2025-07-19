@@ -11,9 +11,9 @@ def get_sheets_service():
     return build("sheets", "v4", credentials=creds)
 
 # ✅ Lê as mensagens da planilha e retorna agrupadas por telefone
-def listar_mensagens(limit=100):
+def listar_mensagens(limit=1000):
     spreadsheet_id = os.environ["PLANILHA_ID"]
-    range_name = "Página1!A2:D"  # A:Telefone | B:Mensagem | C:Resposta | D:DataHora
+    range_name = "Página1!A2:G"  # A:Telefone | B:Mensagem | C:Resposta | D:DataHora | E/F/... | G:Processado
 
     service = get_sheets_service()
     result = service.spreadsheets().values().get(
@@ -24,19 +24,22 @@ def listar_mensagens(limit=100):
     values = result.get("values", [])[:limit]
     historico = {}
 
-    for row in values:
+    for idx, row in enumerate(values):
         telefone = row[0] if len(row) > 0 else ""
         mensagem = row[1] if len(row) > 1 else ""
         resposta = row[2] if len(row) > 2 else ""
         datahora = row[3] if len(row) > 3 else ""
+        processado = row[6].strip().lower() == "ok" if len(row) > 6 else False
 
         if telefone:
             if telefone not in historico:
                 historico[telefone] = []
             historico[telefone].append({
+                "linha": idx + 2,
                 "mensagem": mensagem,
                 "resposta": resposta,
-                "datahora": datahora
+                "datahora": datahora,
+                "processado": processado
             })
 
     return historico
@@ -58,9 +61,28 @@ def salvar_mensagem(data: dict):
     result = service.spreadsheets().values().append(
         spreadsheetId=spreadsheet_id,
         range=range_name,
-        valueInputOption="USER_ENTERED",  # ✅ melhor para exibir corretamente no Sheets
+        valueInputOption="USER_ENTERED",
         insertDataOption="INSERT_ROWS",
         body=body
     ).execute()
 
     print(f"✅ {result.get('updates', {}).get('updatedCells', 0)} células adicionadas com sucesso.")
+
+# ✅ Marca como processado: preenche as colunas C:D:G na linha indicada
+def marcar_como_processado(linha, resposta, datahora):
+    spreadsheet_id = os.environ["PLANILHA_ID"]
+    range_name = f"Página1!C{linha}:G{linha}"  # C:Resposta | D:DataHora | G:Processado
+
+    service = get_sheets_service()
+    body = {
+        "values": [[resposta, datahora, "", "", "OK"]]  # Mantém colunas intermediárias em branco
+    }
+
+    result = service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=range_name,
+        valueInputOption="USER_ENTERED",
+        body=body
+    ).execute()
+
+    print(f"✅ Linha {linha} marcada como processada (coluna G).")
