@@ -35,7 +35,7 @@ def gerar_resposta_com_gpt(mensagem_usuario):
     try:
         print("📡 Chamando a OpenAI...")
         resposta = client.chat.completions.create(
-            model="gpt-3.5-turbo",  # Temporário para testes; volte para "gpt-4" se necessário
+            model="gpt-4o-mini",  # Novo modelo: melhor custo-benefício e mais inteligente
             messages=[
                 {"role": "system", "content": "Você é Amanda Mariano, advogada (OAB 18.020), especialista em negociação de precatórios pela ProsperoJus."},
                 {"role": "user", "content": prompt_final}
