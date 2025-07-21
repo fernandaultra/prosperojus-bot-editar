@@ -38,17 +38,24 @@ def home():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     dados = request.get_json(force=True)
+    print("📨 JSON recebido no webhook:", dados)  # 👈 DEBUG
+
     numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
 
+    # 🔎 Tenta encontrar a mensagem dentro das diversas estruturas possíveis
     mensagem = None
     for chave in ["message", "body", "text"]:
         valor = dados.get(chave)
         if isinstance(valor, str):
             mensagem = valor
             break
-        if isinstance(valor, dict) and "message" in valor:
-            mensagem = valor["message"]
-            break
+        if isinstance(valor, dict):
+            if "message" in valor:
+                mensagem = valor["message"]
+                break
+            if "text" in valor:
+                mensagem = valor["text"]
+                break
 
     if not mensagem:
         mensagem = dados.get("messageData", {}).get("textMessageData", {}).get("textMessage")
