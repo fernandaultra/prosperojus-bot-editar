@@ -17,12 +17,17 @@ load_dotenv()
 # 🕒 Fuso horário de Brasília
 brasilia = pytz.timezone("America/Sao_Paulo")
 
-# 🔄 Carrega histórico inicial do Google Sheets
-historico_por_telefone = listar_mensagens()
-for lista in historico_por_telefone.values():
-    lista.sort(key=lambda x: x.get("datahora", ""), reverse=True)  # ✅ Organiza da mais recente p/ mais antiga
-    for item in lista:
-        item["html"] = Markup(markdown(item.get("resposta") or "*[❌ Sem resposta]*"))
+# 🔄 Carrega histórico inicial do Google Sheets (somente mensagens com resposta)
+historico_por_telefone = {}
+dados = listar_mensagens()
+for tel, lista in dados.items():
+    lista_com_resposta = [item for item in lista if item.get("resposta")]
+    lista_com_resposta.sort(key=lambda x: x.get("datahora", ""), reverse=True)
+
+    for item in lista_com_resposta:
+        item["html"] = Markup(markdown(item.get("resposta")))
+
+    historico_por_telefone[tel] = lista_com_resposta[:10]
 
 MAX_MENSAGENS = 10
 
@@ -53,9 +58,13 @@ def webhook():
     elif isinstance(mensagem, str) and mensagem.startswith("{'message':"):
         mensagem = mensagem.replace("{'message': '", "").rstrip("'}")
 
+    # 🔒 Proteção simples contra chamadas malformadas
     if not numero or not mensagem:
         return jsonify({"erro": "Número ou mensagem ausente"}), 400
+    if not numero.startswith("55"):
+        return jsonify({"erro": "Origem não autorizada"}), 403
 
+    print("📡 Chamando a OpenAI para gerar resposta...")
     resposta = gerar_resposta_com_gpt(mensagem) or "*[❌ Erro: nenhuma resposta gerada]*"
     datahora = datetime.now(brasilia)
 

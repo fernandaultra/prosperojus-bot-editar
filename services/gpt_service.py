@@ -1,6 +1,5 @@
 import os
-import time
-from openai import OpenAI, RateLimitError
+from openai import OpenAI
 from dotenv import load_dotenv
 
 # Carrega variáveis do .env
@@ -33,8 +32,9 @@ def gerar_resposta_com_gpt(mensagem_usuario):
 """
 
     try:
+        print("📡 Chamando a OpenAI...")
         resposta = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "Você é Amanda Mariano, advogada (OAB 18.020), especialista em negociação de precatórios pela ProsperoJus."},
                 {"role": "user", "content": prompt_final}
@@ -46,11 +46,6 @@ def gerar_resposta_com_gpt(mensagem_usuario):
         conteudo = resposta.choices[0].message.content.strip()
         return conteudo if conteudo else None
 
-    except RateLimitError as e:
-        print("⚠️ Rate limit atingido. Aguardando 5 segundos...")
-        time.sleep(5)
-        return "⚠️ Volume alto de mensagens. Tente novamente em instantes."
-
     except Exception as e:
         print("❌ Erro ao chamar OpenAI:", e)
-        return "❌ Erro ao gerar resposta automática. Por favor, revise manualmente."
+        return None
