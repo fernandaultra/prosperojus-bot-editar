@@ -10,6 +10,7 @@ import os
 import base64
 import requests
 from dotenv import load_dotenv
+import sys  # 👈 necessário para flush nos logs
 
 app = Flask(__name__)
 load_dotenv()
@@ -37,8 +38,12 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    dados = request.get_json(force=True)
-    print("📨 JSON recebido no webhook:", dados)  # 👈 DEBUG
+    try:
+        dados = request.get_json(force=True)
+        print("📨 JSON recebido no webhook:", dados, file=sys.stdout, flush=True)
+    except Exception as e:
+        print("❌ Erro ao interpretar JSON no webhook:", e, file=sys.stderr, flush=True)
+        return jsonify({"erro": "JSON inválido"}), 400
 
     numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
 
@@ -71,7 +76,7 @@ def webhook():
     if not numero.startswith("55"):
         return jsonify({"erro": "Origem não autorizada"}), 403
 
-    print("📡 Chamando a OpenAI para gerar resposta...")
+    print("📡 Chamando a OpenAI para gerar resposta...", file=sys.stdout, flush=True)
     resposta = gerar_resposta_com_gpt(mensagem) or "*[❌ Erro: nenhuma resposta gerada]*"
     datahora = datetime.now(brasilia)
 
