@@ -1,4 +1,5 @@
 import os
+import traceback
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -34,7 +35,7 @@ def gerar_resposta_com_gpt(mensagem_usuario):
     try:
         print("📡 Chamando a OpenAI...")
         resposta = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",  # Temporário para testes; volte para "gpt-4" se necessário
             messages=[
                 {"role": "system", "content": "Você é Amanda Mariano, advogada (OAB 18.020), especialista em negociação de precatórios pela ProsperoJus."},
                 {"role": "user", "content": prompt_final}
@@ -43,9 +44,15 @@ def gerar_resposta_com_gpt(mensagem_usuario):
             max_tokens=700
         )
 
+        # Loga toda a resposta da OpenAI como JSON formatado
+        print("📦 Resposta bruta da OpenAI:")
+        print(resposta.model_dump_json(indent=2))
+
         conteudo = resposta.choices[0].message.content.strip()
+        print("✅ Resposta da OpenAI (limpa):", conteudo)
         return conteudo if conteudo else None
 
     except Exception as e:
-        print("❌ Erro ao chamar OpenAI:", e)
+        print("❌ Erro ao chamar OpenAI:", str(e))
+        traceback.print_exc()
         return None
