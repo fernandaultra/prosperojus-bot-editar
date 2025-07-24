@@ -10,15 +10,13 @@ import os
 import base64
 import requests
 from dotenv import load_dotenv
-import sys  # 👈 necessário para flush nos logs
+import sys
 
 app = Flask(__name__)
 load_dotenv()
 
-# 🕒 Fuso horário de Brasília
 brasilia = pytz.timezone("America/Sao_Paulo")
 
-# 🔄 Carrega histórico inicial do Google Sheets (somente mensagens com resposta)
 historico_por_telefone = {}
 dados = listar_mensagens()
 for tel, lista in dados.items():
@@ -46,8 +44,6 @@ def webhook():
         return jsonify({"erro": "JSON inválido"}), 400
 
     numero = dados.get("phone") or dados.get("from") or dados.get("remoteJid") or dados.get("sender")
-
-    # 🔎 Tenta encontrar a mensagem dentro das diversas estruturas possíveis
     mensagem = None
     for chave in ["message", "body", "text"]:
         valor = dados.get(chave)
@@ -70,7 +66,6 @@ def webhook():
     elif isinstance(mensagem, str) and mensagem.startswith("{'message':"):
         mensagem = mensagem.replace("{'message': '", "").rstrip("'}")
 
-    # 🔒 Proteção simples contra chamadas malformadas
     if not numero or not mensagem:
         return jsonify({"erro": "Número ou mensagem ausente"}), 400
     if not numero.startswith("55"):
@@ -108,11 +103,24 @@ def mensagens():
 
     html = """<!DOCTYPE html>
     <html><head><meta charset='utf-8'>
-    <meta http-equiv="refresh" content="10">
+    <meta http-equiv=\"refresh\" content=\"10\">
     <title>📨 Mensagens - ProsperoJus</title>
     <style>
         body { font-family: Arial; padding: 20px; }
-        .abas a { margin-right: 10px; text-decoration: none; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+        .abas { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .abas a {
+            text-decoration: none;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            white-space: nowrap;
+            background-color: white;
+        }
+        .abas a.ativo {
+            background-color: lightblue;
+            font-weight: bold;
+            color: black;
+        }
         .card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; margin-top: 10px; background: #f9f9f9; }
         .sugestao { margin-top: 10px; }
         textarea { width: 100%; height: 100px; display: none; margin-top: 10px; }
@@ -133,25 +141,25 @@ def mensagens():
     </head>
     <body>
         <h2>📨 Mensagens Recebidas - ProsperoJus</h2>
-        <div class="abas">
+        <div class=\"abas\">
             {% for tel in telefones %}
-                <a href="/mensagens?telefone={{ tel }}">{{ tel }}</a>
+                <a href=\"/mensagens?telefone={{ tel }}\" class=\"{{ 'ativo' if tel == telefone else '' }}\">{{ tel }}</a>
             {% endfor %}
         </div>
         {% for item in mensagens %}
-            <div class="card">
+            <div class=\"card\">
                 <div><strong>📅 {{ item.datahora }}</strong></div>
-                <div><strong>📥 Mensagem:</strong> {{ item.mensagem }}</div>
-                <div class="sugestao">
+                <div><strong>📬 Mensagem:</strong> {{ item.mensagem }}</div>
+                <div class=\"sugestao\">
                     <strong>🤖 Sugestão:</strong>
-                    <div id="resposta-{{ loop.index }}">{{ item.html|safe }}</div>
-                    <form method="POST" action="/editar">
-                        <input type="hidden" name="telefone" value="{{ telefone }}">
-                        <input type="hidden" name="datahora" value="{{ item.datahora }}">
-                        <textarea name="nova_resposta" id="edit-{{ loop.index }}">{{ item.resposta }}</textarea>
-                        <button type="button" id="btn-editar-{{ loop.index }}" style="background-color:#f9c74f;" onclick="editar({{ loop.index }})">✏️ Editar</button>
-                        <button type="submit" id="btn-salvar-{{ loop.index }}" style="display:none;background-color:#f9c74f;">📎 Salvar texto</button>
-                        <button type="button" style="background-color:#90be6d;" onclick="copiarTexto('resposta-{{ loop.index }}')">📋 Copiar</button>
+                    <div id=\"resposta-{{ loop.index }}\">{{ item.html|safe }}</div>
+                    <form method=\"POST\" action=\"/editar\">
+                        <input type=\"hidden\" name=\"telefone\" value=\"{{ telefone }}\">
+                        <input type=\"hidden\" name=\"datahora\" value=\"{{ item.datahora }}\">
+                        <textarea name=\"nova_resposta\" id=\"edit-{{ loop.index }}\">{{ item.resposta }}</textarea>
+                        <button type=\"button\" id=\"btn-editar-{{ loop.index }}\" style=\"background-color:#f9c74f;\" onclick=\"editar({{ loop.index }})\">✏️ Editar</button>
+                        <button type=\"submit\" id=\"btn-salvar-{{ loop.index }}\" style=\"display:none;background-color:#f9c74f;\">📌 Salvar texto</button>
+                        <button type=\"button\" style=\"background-color:#90be6d;\" onclick=\"copiarTexto('resposta-{{ loop.index }}')\">📋 Copiar</button>
                     </form>
                 </div>
             </div>
